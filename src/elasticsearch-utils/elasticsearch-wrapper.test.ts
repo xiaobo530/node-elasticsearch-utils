@@ -78,13 +78,13 @@ describe("Elasticsearch Wrapper", () => {
         },
       ];
  
-      const result = await wrapper.indexMany(indexName, docs);
+      const result = await wrapper.indexMany(indexName, docs); 
 
       console.log(result);
 
-      // expect(result.length).toBe(3);
-      // expect(result[0].statusCode).toBe(201);
-      // expect(result[0].result).toBe("created");
+      expect(result.length).toBe(3);
+      expect(result[0].statusCode).toBe(201);
+      expect(result[0].result).toBe("created");
     } catch (error) {
       throw error;
     }

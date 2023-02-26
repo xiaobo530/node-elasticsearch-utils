@@ -78,7 +78,7 @@ export function createElasticWrapper(cfg: ElasticConfig) {
     index: string,
     docs: T | Array<T>,
     options?: Partial<RequestParams.Index>
-  ): Promise<Array<SimpleResponseResult> | null> {
+  ): Promise<Array<SimpleResponseResult>> {
     if (!Array.isArray(docs)) {
       docs = [docs];
     }
@@ -91,18 +91,19 @@ export function createElasticWrapper(cfg: ElasticConfig) {
     //   return await client.index(toIndexRequest(index, doc, options));
     // }).forEach(async (val)=>await val);
 
-    const response = await pMap(docs, async (doc) => {
-      return await client.index(toIndexRequest(index, doc, options));
-    });
-
-    console.log(response);
-
+    const response = await pMap(
+      docs,
+      async (doc) => {
+        return await client.index(toIndexRequest(index, doc, options));
+      },
+      { concurrency: 5 }
+    );
     // console.log(response);
 
-    // const result = response.map((res) =>toSimpleResult(res));
+    const result = response.map((res) => toSimpleResult(res));
+    // console.log(result);
 
-    return null;
-    // return result;
+    return result;
   }
 
   async function deleteById(
