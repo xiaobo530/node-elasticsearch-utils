@@ -1,0 +1,47 @@
+{
+  "name": "elasticsearch-utils",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --watch"
+  },
+  "dependencies": {
+    "@elastic/elasticsearch": "^7.17.0",
+    "aggregate-error": "^4.0.1",
+    "elastic-builder": "^2.17.3",
+    "got": "^12.5.3",
+    "p-map": "^5.5.0",
+    "rxjs": "^7.8.0",
+    "winston-elasticsearch": "^0.17.2"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.21.0",
+    "@babel/preset-env": "^7.20.2",
+    "@babel/preset-typescript": "^7.21.0",
+    "@jest/globals": "^29.4.2",
+    "@types/amqplib": "^0.10.1",
+    "@types/jest": "^29.4.0",
+    "@types/node": "^18.13.0",
+    "babel-jest": "^29.4.3",
+    "cross-env": "^7.0.3",
+    "jest": "^29.4.2",
+    "jest-environment-jsdom": "^29.4.2",
+    "ts-jest": "^29.0.5",
+    "ts-node": "^10.9.1",
+    "typescript": "^4.9.5"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xiaobo530/node-elasticsearch-utils.git"
+  },
+  "author": "xiaobo530@aliyun.com",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/xiaobo530/node-elasticsearch-utils/issues"
+  },
+  "homepage": "https://github.com/xiaobo530/node-elasticsearch-utils#readme"
+}
