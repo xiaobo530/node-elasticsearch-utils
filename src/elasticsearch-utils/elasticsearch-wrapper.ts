@@ -9,6 +9,11 @@ export interface ElasticConfig {
 
 export interface IBaseDoc extends Record<string, any> {
   id?: string;
+  _index?: string;
+  _id?: string;
+  _version?: number;
+  _seq_no?: number;
+  _primary_term?: number;
   [index: string]: any;
 }
 
@@ -43,10 +48,22 @@ function toIndexRequest<T extends IBaseDoc>(
   };
 }
 
-function toSimpleResult(apiResponse: ApiResponse): SimpleResponseResult {
+function toSimpleResult(apiResponse: any): any {
   const statusCode = apiResponse.statusCode;
   const { _index, _id, _version, result } = apiResponse.body;
   return { statusCode, _index, _id, _version, result } as SimpleResponseResult;
+}
+
+// function toDoc<T extends IBaseDoc>(apiResponse: ApiResponse): T {
+function toDoc(apiResponse: any): any {
+  const statusCode = apiResponse.statusCode;
+  const { _index, _id, _version, _seq_no, _primary_term, _source, found } =
+    apiResponse.body;
+  if (found) {
+    return { _index, _id, _version, _seq_no, _primary_term, ..._source };
+  } else {
+    return { _index, _id };
+  }
 }
 
 //******************************* */
@@ -54,24 +71,32 @@ function toSimpleResult(apiResponse: ApiResponse): SimpleResponseResult {
 export function createElasticWrapper(cfg: ElasticConfig) {
   const client = new Client({ node: cfg.url });
 
-  function get(
-    indexName: string,
+  async function getById(
+    index: string,
     ids: string | Array<string>,
     options?: RequestParams.Get
   ) {
     if (!Array.isArray(ids)) {
       ids = [ids];
     }
-    // Promise.all(
-    //   ids.map((id) => {
-    //    const  client.get({ ...options, index: indexName, id: id });
-    //   })
-    // );
-    // const indexName = "game-of-thrones";
-    // const id = "pesnf4YBJS5NHzNLdy4K";
 
-    // const { body } = await helper.client.get({ index: indexName, id: id });
-    // console.log(body);
+    const response = await pMap(
+      ids,
+      async (id) => {
+        try {
+          return await client.get({ ...options, index, id });
+        } catch (error: any) {
+          // console.log(error);
+          return { body: error.meta.body };
+        }
+      },
+      { concurrency: 5, stopOnError: false }
+    );
+    console.log(response);
+
+    const result = response.map((res) => toDoc(res));
+
+    console.log(result);
   }
 
   async function indexMany<T extends IBaseDoc>(
@@ -82,14 +107,6 @@ export function createElasticWrapper(cfg: ElasticConfig) {
     if (!Array.isArray(docs)) {
       docs = [docs];
     }
-
-    // const response = await Promise.all(
-    //   docs.map((doc) => client.index(toIndexRequest(index, doc, options)))
-    // );
-
-    // const response = docs.map(async (doc) => {
-    //   return await client.index(toIndexRequest(index, doc, options));
-    // }).forEach(async (val)=>await val);
 
     const response = await pMap(
       docs,
@@ -110,22 +127,24 @@ export function createElasticWrapper(cfg: ElasticConfig) {
     indexName: string,
     ids: string | Array<string>,
     options?: RequestParams.Delete
-  ): Promise<Array<InsertResult>> {
+  ): Promise<Array<SimpleResponseResult>> {
     if (!Array.isArray(ids)) {
       ids = [ids];
     }
-    const response = await Promise.all(
-      ids.map((id) => client.delete({ ...options, index: indexName, id: id }))
+
+    const response = await pMap(
+      ids,
+      async (id) => {
+        try {
+          return await client.delete({ ...options, index: indexName, id: id });
+        } catch (error:any) {
+          return { body: error.meta.body };
+        }
+      },
+      { concurrency: 5 }
     );
 
-    console.log(response);
-
-    const result: Array<InsertResult> = response.map((res) => {
-      const statusCode = res.statusCode;
-      const { _index, _id, _version, result } = res.body;
-      return { statusCode, _index, _id, _version, result } as InsertResult;
-    });
-
+    const result = response.map((res) => toSimpleResult(res));
     return result;
   }
 
@@ -147,6 +166,7 @@ export function createElasticWrapper(cfg: ElasticConfig) {
   return {
     client,
     indexMany,
+    getById,
     deleteById,
     deleteByQuery,
     close,

@@ -27,7 +27,7 @@ describe("Elasticsearch Wrapper", () => {
 
       const result = await wrapper.indexMany(indexName, doc);
 
-      console.log(result);
+      // console.log(result);
 
       expect(result![0].statusCode).toBe(201);
       expect(result![0].result).toBe("created");
@@ -50,7 +50,7 @@ describe("Elasticsearch Wrapper", () => {
         op_type: "index",
       });
 
-      console.log(result);
+      // console.log(result);
 
       expect([201, 200]).toContain(result![0].statusCode);
       expect(["created", "updated"]).toContain(result![0].result);
@@ -60,7 +60,7 @@ describe("Elasticsearch Wrapper", () => {
     }
   });
 
-  test.only("index many docs", async () => {
+  test("index many docs", async () => {
     try {
       const indexName = "game-of-thrones";
       const docs = [
@@ -77,10 +77,10 @@ describe("Elasticsearch Wrapper", () => {
           quote: "A mind needs books like a sword needs a whetstone.",
         },
       ];
- 
-      const result = await wrapper.indexMany(indexName, docs); 
 
-      console.log(result);
+      const result = await wrapper.indexMany(indexName, docs);
+
+      // console.log(result);
 
       expect(result.length).toBe(3);
       expect(result[0].statusCode).toBe(201);
@@ -112,18 +112,41 @@ describe("Elasticsearch Wrapper", () => {
   //   }
   // });
 
-  test("delete many docs by id", async () => {
-    const wrapper = await createElasticWrapper({
-      url: "http://localhost:9200",
-    });
-    expect(wrapper.client).not.toBeNull();
+  test.only("delete many docs by id", async () => {
+    try {
+      const indexName = "game-of-thrones";
+      const docs = [
+        {
+          character: "Ned Stark",
+          quote: "Winter is coming.",
+        },
+        {
+          character: "Daenerys Targaryen",
+          quote: "I am the blood of the dragon.",
+        },
+        {
+          character: "Tyrion Lannister",
+          quote: "A mind needs books like a sword needs a whetstone.",
+        },
+      ];
 
-    const indexName = "game-of-thrones";
-    const ids = ["nevZfoYBJS5NHzNLPS7G", "nOvZfoYBJS5NHzNLPS7F"];
+      const inserted = await wrapper.indexMany(indexName, docs, {
+        refresh: true,
+      });
 
-    await wrapper.deleteById(indexName, ids);
+      let ids = inserted.map((r) => r._id!);
+      ids.splice(2, 1);
+      ids.push("not exist id");
+      console.log(ids);
 
-    await wrapper.close();
+      const result = await wrapper.deleteById(indexName, ids);
+
+      console.log(result);
+      expect(result.every((r) => r.statusCode == 200)).toBeTruthy();
+      expect(result.every((r) => r.result == "deleted")).toBeTruthy();
+    } catch (error) {
+      throw error;
+    }
   });
 
   test("delete many docs by query", async () => {
@@ -145,6 +168,43 @@ describe("Elasticsearch Wrapper", () => {
     console.log(result);
 
     await wrapper.close();
+  });
+
+  test("get many docs", async () => {
+    try {
+      const indexName = "game-of-thrones";
+      const docs = [
+        {
+          character: "Ned Stark",
+          quote: "Winter is coming.",
+        },
+        {
+          character: "Daenerys Targaryen",
+          quote: "I am the blood of the dragon.",
+        },
+        {
+          character: "Tyrion Lannister",
+          quote: "A mind needs books like a sword needs a whetstone.",
+        },
+      ];
+
+      const inserted = await wrapper.indexMany(indexName, docs, {
+        refresh: true,
+      });
+
+      let ids = inserted.map((r) => r._id!);
+
+      ids.push("12345678");
+      console.log(ids);
+
+      await wrapper.getById(indexName, ids);
+
+      // console.log(result);
+      // expect(result.every((r) => r.statusCode == 200)).toBeTruthy();
+      // expect(result.every((r) => r.result == "deleted")).toBeTruthy();
+    } catch (error) {
+      throw error;
+    }
   });
 
   test("get a doc", async () => {
