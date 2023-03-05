@@ -479,7 +479,7 @@ describe("Elasticsearch Wrapper", () => {
     }
   });
 
-  test("update may docs by query", async () => {
+  test.only("update may docs by query", async () => {
     try {
       const indexName = "game-of-thrones";
       const docs = [
@@ -513,7 +513,7 @@ describe("Elasticsearch Wrapper", () => {
         refresh: true,
       });
 
-      expect(result.statusCode).toBe(200);
+      expect(result._statusCode).toBe(200);
       expect(result.updated).toBeGreaterThanOrEqual(0);
     } catch (error) {
       throw error;

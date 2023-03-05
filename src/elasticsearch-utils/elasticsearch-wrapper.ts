@@ -310,8 +310,6 @@ export function createElasticWrapper(cfg: ElasticConfig) {
     const { statusCode, body } = response;
     const { deleted, total } = body;
 
-    // console.log(response);
-
     const result = { _statusCode: statusCode, deleted, total } as ActionResult;
 
     return result;
@@ -378,34 +376,69 @@ export function createElasticWrapper(cfg: ElasticConfig) {
     }
   }
 
-  /**
+    /**
    * update docs by query
    * @param indexName
    * @param updateDoc
    * @param options
    */
-  async function updateByQuery<T extends IUpdateDoc>(
-    indexName: string,
-    updateDoc: T,
-    options?: Partial<RequestParams.UpdateByQuery>
-  ): Promise<SimpleResponseResult> {
-    try {
-      const response = await client.updateByQuery({
-        ...options,
-        index: indexName,
-        body: updateDoc,
-      });
+    async function updateByQuery<T extends IUpdateDoc>(
+      indexName: string,
+      updateDoc: T,
+      options?: Partial<RequestParams.UpdateByQuery>
+    ): Promise<ActionResult> {
+      try {
+        const response = await client.updateByQuery({
+          ...options,
+          index: indexName,
+          body: updateDoc,
+        });
+  
+        const { statusCode, body } = response;
+        const { updated, total } = body;
+    
+        const result = { _statusCode: statusCode, updated, total } as ActionResult;
 
-      // console.log(response);
-
-      const result = toSimpleResult(response);
-
-      // console.log(result);
-      return result;
-    } catch (error) {
-      throw error;
+        
+        // console.log(response);
+  
+        // const result = toSimpleResult(response);
+  
+        // console.log(result);
+        return result;
+      } catch (error) {
+        throw error;
+      }
     }
-  }
+
+  // /**
+  //  * update docs by query
+  //  * @param indexName
+  //  * @param updateDoc
+  //  * @param options
+  //  */
+  // async function updateByQuery<T extends IUpdateDoc>(
+  //   indexName: string,
+  //   updateDoc: T,
+  //   options?: Partial<RequestParams.UpdateByQuery>
+  // ): Promise<SimpleResponseResult> {
+  //   try {
+  //     const response = await client.updateByQuery({
+  //       ...options,
+  //       index: indexName,
+  //       body: updateDoc,
+  //     });
+
+  //     // console.log(response);
+
+  //     const result = toSimpleResult(response);
+
+  //     // console.log(result);
+  //     return result;
+  //   } catch (error) {
+  //     throw error;
+  //   }
+  // }
 
   async function search<T = IBaseDoc>(
     indexName: string,
