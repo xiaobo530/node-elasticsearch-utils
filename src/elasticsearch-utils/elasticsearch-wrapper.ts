@@ -1,5 +1,6 @@
 import { Client, ApiResponse, RequestParams } from "@elastic/elasticsearch";
 import pMap from "p-map";
+import { expect } from "@jest/globals";
 
 /********************************* */
 export interface ElasticConfig {
@@ -17,25 +18,64 @@ export interface IBaseDoc extends Record<string, any> {
   [index: string]: any;
 }
 
+export interface IBaseResult {
+  _statusCode: number;
+  _index: string;
+  _id: string;
+  _error: any;
+  _seq_no: number;
+  _primary_term: number;
+  [index: string]: any;
+}
+
+export interface IUpdateDoc {
+  doc?: Record<string, any>;
+  script?: {
+    lang: "painless";
+    source: string;
+    params?: Record<string, any>;
+  };
+  query?: Record<string, any>;
+  [index: string]: any;
+}
+
 export interface SimpleResponseResult {
   statusCode: number;
   _index?: string;
   _id?: string;
   _version?: number;
   result?: string;
+  total?: number;
+  updated?: number;
+  deleted?: number;
+  error?: any;
+  exist?: boolean;
+  [index: string]: any;
 }
 
-export interface InsertResult {
-  statusCode: number;
+export interface ActionResult {
+  _statusCode: number | null;
   _index?: string;
   _id?: string;
   _version?: number;
-  result?: string;
+  _seq_no?: number;
+  _primary_term?: number;
+  result?: "deleted" | "updated";
+  total?: number;
+  updated?: number;
+  deleted?: number;
+  error?: any;
+  exist?: boolean;
+  [index: string]: any;
+}
+
+export interface ExistsResult extends IBaseResult {
+  exists: boolean;
 }
 
 //******************************* */
 
-function toIndexRequest<T extends IBaseDoc>(
+export function toIndexRequest<T extends IBaseDoc>(
   index: string,
   doc: T,
   options?: Partial<RequestParams.Index>
@@ -44,25 +84,36 @@ function toIndexRequest<T extends IBaseDoc>(
     ...options,
     index: index,
     body: doc,
-    id: doc.id ?? undefined,
+    id: doc.id,
   };
 }
 
-function toSimpleResult(apiResponse: any): any {
+export function toSimpleResult(apiResponse: any): SimpleResponseResult {
   const statusCode = apiResponse.statusCode;
-  const { _index, _id, _version, result } = apiResponse.body;
-  return { statusCode, _index, _id, _version, result } as SimpleResponseResult;
+  const { _index, _id, _version, result, deleted, total, error, updated } =
+    apiResponse.body;
+  return {
+    statusCode,
+    _index,
+    _id,
+    _version,
+    result,
+    deleted,
+    updated,
+    total,
+    error,
+  } as SimpleResponseResult;
 }
 
-// function toDoc<T extends IBaseDoc>(apiResponse: ApiResponse): T {
-function toDoc(apiResponse: any): any {
+export function toDoc<T extends IBaseDoc = any>(apiResponse: any): T {
+  // function toDoc(apiResponse: any): any {
   const statusCode = apiResponse.statusCode;
   const { _index, _id, _version, _seq_no, _primary_term, _source, found } =
     apiResponse.body;
   if (found) {
     return { _index, _id, _version, _seq_no, _primary_term, ..._source };
   } else {
-    return { _index, _id };
+    return { _index, _id: undefined } as T;
   }
 }
 
@@ -71,11 +122,65 @@ function toDoc(apiResponse: any): any {
 export function createElasticWrapper(cfg: ElasticConfig) {
   const client = new Client({ node: cfg.url });
 
-  async function getById(
+  /**
+   * check doc exists by id
+   * @param index
+   * @param ids
+   * @param options
+   * @returns
+   */
+  async function exists(
+    index: string,
+    ids: string | Array<string>,
+    options?: RequestParams.Exists
+  ): Promise<Array<ActionResult>> {
+    if (!Array.isArray(ids)) {
+      ids = [ids];
+    }
+
+    const response = await pMap(
+      ids,
+      async (id) => {
+        try {
+          const { body, statusCode } = await client.exists({
+            ...options,
+            index,
+            id,
+          });
+          return {
+            exists: body,
+            _statusCode: statusCode,
+            _id: id,
+            _index: index,
+          };
+        } catch (error: any) {
+          return {
+            exists: false,
+            _statusCode: 404,
+            _id: id,
+            _index: index,
+            error: error,
+          };
+        }
+      },
+      { concurrency: 5, stopOnError: false }
+    );
+
+    return response;
+  }
+
+  /**
+   * get docs by id
+   * @param index
+   * @param ids
+   * @param options
+   * @returns
+   */
+  async function getById<T extends IBaseDoc = IBaseDoc>(
     index: string,
     ids: string | Array<string>,
     options?: RequestParams.Get
-  ) {
+  ): Promise<Array<T>> {
     if (!Array.isArray(ids)) {
       ids = [ids];
     }
@@ -92,13 +197,21 @@ export function createElasticWrapper(cfg: ElasticConfig) {
       },
       { concurrency: 5, stopOnError: false }
     );
-    console.log(response);
+    // console.log(response);
 
     const result = response.map((res) => toDoc(res));
 
-    console.log(result);
+    // console.log(result);
+    return result;
   }
 
+  /**
+   * index docs
+   * @param index
+   * @param docs
+   * @param options
+   * @returns
+   */
   async function indexMany<T extends IBaseDoc>(
     index: string,
     docs: T | Array<T>,
@@ -123,11 +236,18 @@ export function createElasticWrapper(cfg: ElasticConfig) {
     return result;
   }
 
+  /**
+   * delete docs by id(s)
+   * @param indexName
+   * @param ids
+   * @param options
+   * @returns
+   */
   async function deleteById(
     indexName: string,
     ids: string | Array<string>,
-    options?: RequestParams.Delete
-  ): Promise<Array<SimpleResponseResult>> {
+    options?: Partial<RequestParams.Delete>
+  ): Promise<Array<ActionResult>> {
     if (!Array.isArray(ids)) {
       ids = [ids];
     }
@@ -136,30 +256,191 @@ export function createElasticWrapper(cfg: ElasticConfig) {
       ids,
       async (id) => {
         try {
-          return await client.delete({ ...options, index: indexName, id: id });
-        } catch (error:any) {
-          return { body: error.meta.body };
+          const { statusCode, body } = await client.delete({
+            ...options,
+            index: indexName,
+            id: id,
+          });
+          const { _index, _id, _seq_no, _primary_term, result } = body;
+          return {
+            _statusCode: statusCode,
+            _index,
+            _id,
+            _seq_no,
+            _primary_term,
+            result,
+          } as ActionResult;
+        } catch (error: any) {
+          return { _statusCode: 404, _index: indexName, _id: id };
         }
       },
       { concurrency: 5 }
     );
 
-    const result = response.map((res) => toSimpleResult(res));
-    return result;
+    // console.log(response);
+
+    // const result = response.map((res) => toSimpleResult(res));
+    return response;
   }
 
-  async function deleteByQuery(
+  // /**
+  //  * delete docs by id(s)
+  //  * @param indexName
+  //  * @param ids
+  //  * @param options
+  //  * @returns
+  //  */
+  // async function deleteById(
+  //   indexName: string,
+  //   ids: string | Array<string>,
+  //   options?: Partial<RequestParams.Delete>
+  // ): Promise<Array<SimpleResponseResult>> {
+  //   if (!Array.isArray(ids)) {
+  //     ids = [ids];
+  //   }
+
+  //   const response = await pMap(
+  //     ids,
+  //     async (id) => {
+  //       try {
+  //         return await client.delete({ ...options, index: indexName, id: id });
+  //       } catch (error: any) {
+  //         return { body: error.meta.body };
+  //       }
+  //     },
+  //     { concurrency: 5 }
+  //   );
+
+  //   console.log(response);
+
+  //   const result = response.map((res) => toSimpleResult(res));
+  //   return result;
+  // }
+
+  /**
+   * delete docs by query
+   * @param indexNames
+   * @param query
+   * @param options
+   * @returns
+   */
+  async function deleteByQuery<T = Record<string, any>>(
     indexNames: string | Array<string>,
-    query: Record<string, any>
-  ): Promise<boolean> {
-    const { body, statusCode } = await client.deleteByQuery({
+    query: Record<string, any>,
+    options?: Partial<RequestParams.DeleteByQuery>
+  ): Promise<SimpleResponseResult> {
+    const response = await client.deleteByQuery({
+      ...options,
       index: indexNames,
       body: query,
     });
 
-    return statusCode == 200;
+    console.log(response);
+
+    const result = toSimpleResult(response);
+
+    return result;
   }
 
+  /**
+   * update one or many docs by id
+   * @param indexName
+   * @param ids
+   * @param updateDoc
+   * @param options
+   * @returns
+   */
+  async function updateById<T extends IUpdateDoc>(
+    indexName: string,
+    ids: string | Array<string>,
+    updateDoc: T,
+    options?: Partial<RequestParams.Update>
+  ): Promise<Array<SimpleResponseResult>> {
+    try {
+      if (!Array.isArray(ids)) {
+        ids = [ids];
+      }
+
+      const response = await pMap(
+        ids,
+        async (id) => {
+          try {
+            return await client.update({
+              ...options,
+              index: indexName,
+              id: id,
+              body: updateDoc,
+            });
+          } catch (error: any) {
+            const { body, statusCode } = error.meta;
+            return { body, statusCode } as ApiResponse;
+          }
+        },
+        { concurrency: 5 }
+      );
+
+      const result = response.map((res) => toSimpleResult(res));
+
+      return result;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * update docs by query
+   * @param indexName
+   * @param updateDoc
+   * @param options
+   */
+  async function updateByQuery<T extends IUpdateDoc>(
+    indexName: string,
+    updateDoc: T,
+    options?: Partial<RequestParams.UpdateByQuery>
+  ): Promise<SimpleResponseResult> {
+    try {
+      const response = await client.updateByQuery({
+        ...options,
+        index: indexName,
+        body: updateDoc,
+      });
+
+      // console.log(response);
+
+      const result = toSimpleResult(response);
+
+      // console.log(result);
+      return result;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async function search<T = IBaseDoc>(
+    indexName: string,
+    query: Record<string, any>,
+    options?: RequestParams.Search
+  ): Promise<Array<T>> {
+    const response = await client.search({
+      ...options,
+      index: indexName,
+      body: query,
+    });
+    if (response.statusCode == 200) {
+      // console.log(response.body.hits.hits);
+      const result = response.body.hits.hits.map((doc: any) => {
+        const { _index, _id, _seq_no, _primary_term, _score } = doc;
+        return { _index, _id, _seq_no, _primary_term, _score, ...doc._source };
+      });
+      return result;
+    } else {
+      return [];
+    }
+  }
+
+  /**
+   * close es client
+   */
   async function close() {
     await client.close();
   }
@@ -169,6 +450,10 @@ export function createElasticWrapper(cfg: ElasticConfig) {
     getById,
     deleteById,
     deleteByQuery,
+    updateById,
+    updateByQuery,
+    search,
+    exists,
     close,
   };
 }

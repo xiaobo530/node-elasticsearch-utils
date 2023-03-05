@@ -2,8 +2,11 @@ import { describe, test, expect } from "@jest/globals";
 import {
   createElasticWrapper,
   ElasticsearchWrapper,
+  toSimpleResult,
 } from "./elasticsearch-wrapper";
 import { Client, ApiResponse, RequestParams } from "@elastic/elasticsearch";
+import { isUndefined } from "util";
+import { IBaseDoc, IUpdateDoc } from "./elasticsearch-wrapper";
 
 describe("Elasticsearch Wrapper", () => {
   let wrapper: ElasticsearchWrapper;
@@ -90,29 +93,50 @@ describe("Elasticsearch Wrapper", () => {
     }
   });
 
-  // test("delete a doc by id", async () => {
-  //   try {
-  //     const indexName = "game-of-thrones";
-  //     const doc = {
-  //       character: "Ned Stark",
-  //       quote: "Winter is coming.",
-  //     };
+  test.only("delete one docs by id", async () => {
+    try {
+      const indexName = "game-of-thrones";
+      const docs = [
+        {
+          character: "Ned Stark",
+          quote: "Winter is coming.",
+        },
+      ];
 
-  //     const inserted = await wrapper.indexMany(indexName, doc);
+      const inserted = await wrapper.indexMany(indexName, docs, {
+        refresh: true,
+      });
 
-  //     const id = inserted[0]._id;
+      let id = inserted.map((r) => r._id!)[0];
+      // console.log(id);
 
-  //     const result = await wrapper.deleteById(indexName, id!);
+      const result = (await wrapper.deleteById(indexName, id))![0];
 
-  //     console.log(result);
-  //     expect(result[0].statusCode).toBe(200);
-  //     expect(result[0].result).toBe("deleted");
-  //   } catch (error) {
-  //     throw error;
-  //   }
-  // });
+      // console.log(result);
+      expect(result._statusCode).toBe(200);
+      expect(result.result).toBe("deleted");
+    } catch (error) {
+      throw error;
+    }
+  });
 
-  test.only("delete many docs by id", async () => {
+  test("delete not exist id", async () => {
+    try {
+      const indexName = "game-of-thrones";
+      let id = "a not exits id";
+
+      const result = (await wrapper.deleteById(indexName, id))[0];
+      // console.log(result);
+
+      expect(result.statusCode).toBeUndefined();
+      expect(result.result).toBe("not_found");
+    } catch (error) {
+      throw error;
+      // console.log(error);
+    }
+  });
+
+  test("delete many docs by id", async () => {
     try {
       const indexName = "game-of-thrones";
       const docs = [
@@ -135,13 +159,11 @@ describe("Elasticsearch Wrapper", () => {
       });
 
       let ids = inserted.map((r) => r._id!);
-      ids.splice(2, 1);
-      ids.push("not exist id");
-      console.log(ids);
+      // console.log(ids);
 
       const result = await wrapper.deleteById(indexName, ids);
 
-      console.log(result);
+      // console.log(result);
       expect(result.every((r) => r.statusCode == 200)).toBeTruthy();
       expect(result.every((r) => r.result == "deleted")).toBeTruthy();
     } catch (error) {
@@ -150,27 +172,46 @@ describe("Elasticsearch Wrapper", () => {
   });
 
   test("delete many docs by query", async () => {
-    const wrapper = await createElasticWrapper({
-      url: "http://localhost:9200",
-    });
-    expect(wrapper.client).not.toBeNull();
-
-    const indexName = "game-of-thrones";
-    const search = {
-      query: {
-        match: {
-          quote: "dragon",
+    try {
+      const indexName = "game-of-thrones";
+      const docs = [
+        {
+          character: "Ned Stark",
+          quote: "Winter is coming.",
         },
-      },
-    };
+        {
+          character: "Daenerys Targaryen",
+          quote: "I am the blood of the dragon.",
+        },
+        {
+          character: "Tyrion Lannister",
+          quote: "A mind needs books like a sword needs a whetstone.",
+        },
+      ];
 
-    const result = await wrapper.deleteByQuery(indexName, search);
-    console.log(result);
+      const inserted = await wrapper.indexMany(indexName, docs, {
+        refresh: true,
+      });
 
-    await wrapper.close();
+      const search = {
+        query: {
+          match: {
+            quote: "dragon",
+          },
+        },
+      };
+
+      const result = await wrapper.deleteByQuery(indexName, search);
+      console.log(result);
+
+      expect(result.statusCode).toBe(200);
+      expect(result.deleted).toBeGreaterThanOrEqual(1);
+    } catch (error) {
+      throw error;
+    }
   });
 
-  test("get many docs", async () => {
+  test("exists doc", async () => {
     try {
       const indexName = "game-of-thrones";
       const docs = [
@@ -194,98 +235,323 @@ describe("Elasticsearch Wrapper", () => {
 
       let ids = inserted.map((r) => r._id!);
 
-      ids.push("12345678");
-      console.log(ids);
-
-      await wrapper.getById(indexName, ids);
+      const result = await wrapper.exists(indexName, ids);
 
       // console.log(result);
-      // expect(result.every((r) => r.statusCode == 200)).toBeTruthy();
-      // expect(result.every((r) => r.result == "deleted")).toBeTruthy();
+      expect(result.every((r) => r._statusCode == 200)).toBeTruthy();
+      expect(result.every((r) => r.exists)).toBeTruthy();
     } catch (error) {
       throw error;
     }
   });
 
-  test("get a doc", async () => {
-    const wrapper = await createElasticWrapper({
-      url: "http://localhost:9200",
-    });
-    expect(wrapper.client).not.toBeNull();
+  test("not exists doc", async () => {
+    try {
+      const indexName = "game-of-thrones";
+      const id = ["id_not_exists_$$$", "id_not_exists_$$$$"];
 
-    const indexName = "game-of-thrones";
-    const id = "pesnf4YBJS5NHzNLdy4K";
+      const result = await wrapper.exists(indexName, id);
 
-    const { body } = await wrapper.client.get({ index: indexName, id: id });
-    console.log(body);
-
-    await wrapper.close();
+      expect(result.every((r) => r._statusCode == 404)).toBeTruthy();
+      expect(result.every((r) => r.exists)).toBeFalsy();
+    } catch (error) {
+      throw error;
+    }
   });
 
-  test("get many docs", async () => {
-    const wrapper = await createElasticWrapper({
-      url: "http://localhost:9200",
-    });
-    expect(wrapper.client).not.toBeNull();
+  test("get doc by id", async () => {
+    try {
+      const indexName = "game-of-thrones";
+      const docs = [
+        {
+          character: "Ned Stark",
+          quote: "Winter is coming.",
+        },
+      ];
 
-    const indexName = "game-of-thrones";
-    const ids = ["pesnf4YBJS5NHzNLdy4K", "p-s_f4YBJS5NHzNLCC6I"];
+      const inserted = await wrapper.indexMany(indexName, docs, {
+        refresh: true,
+      });
 
-    const result = await Promise.all(
-      ids.map((id) => wrapper.client.get({ index: indexName, id: id }))
-    );
-    console.log(result);
+      let id = inserted[0]._id!;
 
-    const docs = result.map((res) => res.body._source);
-    console.log(docs);
+      const result = (await wrapper.getById(indexName, id))[0];
 
-    await wrapper.close();
+      expect(result._id).toBe(id);
+      expect(result.character).toBe("Ned Stark");
+    } catch (error) {}
   });
 
-  test("update one doc", async () => {
-    const wrapper = await createElasticWrapper({
-      url: "http://localhost:9200",
-    });
-    expect(wrapper.client).not.toBeNull();
+  test("get doc by not exist id", async () => {
+    try {
+      const indexName = "game-of-thrones";
+      let id = "a not exits id";
+      const result = (await wrapper.getById(indexName, id))[0];
+      console.log(result);
 
-    const indexName = "game-of-thrones";
-    const doc = {
-      character: "Ned Stark",
-      quote: "Winter is coming.",
-      isAlive: true,
-    };
+      expect(result._id).toBeUndefined();
+    } catch (error) {}
+  });
 
-    await wrapper.indexMany(indexName, doc, { id: "1" });
+  test("get many docs by id", async () => {
+    try {
+      const indexName = "game-of-thrones";
+      const docs = [
+        {
+          character: "Ned Stark",
+          quote: "Winter is coming.",
+        },
+        {
+          character: "Daenerys Targaryen",
+          quote: "I am the blood of the dragon.",
+        },
+        {
+          character: "Tyrion Lannister",
+          quote: "A mind needs books like a sword needs a whetstone.",
+        },
+      ];
 
-    await wrapper.client.update({
-      index: "game-of-thrones",
-      id: "1",
-      body: {
+      const inserted = await wrapper.indexMany(indexName, docs, {
+        refresh: true,
+      });
+
+      let ids = inserted.map((doc) => doc._id!);
+
+      const result = await wrapper.getById(indexName, ids);
+
+      expect(result.every((r) => r._id === undefined)).toBeFalsy();
+    } catch (error) {}
+  });
+
+  test("update one doc by id using doc model", async () => {
+    try {
+      const id = "id_for_update_one_doc";
+      const indexName = "game-of-thrones";
+      const doc = {
+        id: id,
+        character: "Ned Stark",
+        quote: "Winter is coming.",
+        isAlive: true,
+      };
+
+      await wrapper.indexMany(indexName, doc);
+
+      const result = await wrapper.updateById(indexName, id, {
         doc: {
           isAlive: false,
+          newField: "a new field",
         },
-      },
-    });
+      });
 
-    const { body } = await wrapper.client.get({ index: indexName, id: "1" });
-    console.log(body);
-
-    await wrapper.close();
+      expect(result[0].statusCode).toBe(200);
+      expect(result[0].result).toBe("updated");
+    } catch (error) {
+      throw error;
+    }
   });
 
-  // test("get/set a string by keyPrefix: app", async () => {
-  //   const client = await createRedisClient({
-  //     url: "redis://127.0.0.1:6379/0",
-  //     keyPrefix: "app:",
-  //   });
-  //   expect(client.ioredis).not.toBeNull();
+  test("update doc by not exits id ", async () => {
+    try {
+      const id = "id_for_update_not_exist";
+      const indexName = "game-of-thrones";
 
-  //   const key = "test:string";
-  //   const value = "1234567890";
-  //   await client.ioredis.set(key, value);
-  //   const getvalue = await client.ioredis.get(key);
-  //   expect(getvalue).toEqual(value);
+      const result = await wrapper.updateById(indexName, id, {
+        doc: {
+          isAlive: false,
+          newField: "a new field",
+        },
+      });
+      // console.log(result);
 
-  //   await client.close();
-  // });
+      expect(result[0].statusCode).toBe(404);
+      expect(result[0].error).toBeDefined();
+    } catch (error) {
+      throw error;
+    }
+  });
+
+  test("update one doc by id using script model", async () => {
+    try {
+      const id = "id_for_update_one_doc_script";
+      const indexName = "game-of-thrones";
+      const doc = {
+        id: id,
+        character: "Ned Stark",
+        quote: "Winter is coming.",
+        isAlive: true,
+        times: 0,
+      };
+
+      await wrapper.indexMany(indexName, doc);
+
+      const result = await wrapper.updateById(indexName, id, {
+        script: {
+          lang: "painless",
+          source: "ctx._source.times++",
+        },
+      });
+
+      expect(result[0].statusCode).toBe(200);
+      expect(result[0].result).toBe("updated");
+
+      const docs = await wrapper.getById(indexName, id);
+    } catch (error) {
+      throw error;
+    }
+  });
+
+  test("update may doc by id using doc model", async () => {
+    try {
+      const indexName = "game-of-thrones";
+      const docs = [
+        {
+          character: "Ned Stark",
+          quote: "Winter is coming.",
+        },
+        {
+          character: "Daenerys Targaryen",
+          quote: "I am the blood of the dragon.",
+        },
+        {
+          character: "Tyrion Lannister",
+          quote: "A mind needs books like a sword needs a whetstone.",
+        },
+      ];
+
+      const inserted = await wrapper.indexMany(indexName, docs, {
+        refresh: true,
+      });
+
+      let ids = inserted.map((r) => r._id!);
+
+      const result = await wrapper.updateById(indexName, ids, {
+        doc: {
+          isAlive: false,
+          newField: "a new field",
+        },
+      });
+
+      expect(result.every((r) => r.statusCode == 200)).toBeTruthy();
+      expect(result.every((r) => r.result == "updated")).toBeTruthy();
+    } catch (error) {
+      throw error;
+    }
+  });
+
+  test("update may doc by id using script model", async () => {
+    try {
+      const indexName = "game-of-thrones";
+      const docs = [
+        {
+          character: "Ned Stark",
+          quote: "Winter is coming.",
+          times: 0,
+        },
+        {
+          character: "Daenerys Targaryen",
+          quote: "I am the blood of the dragon.",
+          times: 0,
+        },
+        {
+          character: "Tyrion Lannister",
+          quote: "A mind needs books like a sword needs a whetstone.",
+          times: 99,
+        },
+      ];
+
+      const inserted = await wrapper.indexMany(indexName, docs, {
+        refresh: true,
+      });
+
+      let ids = inserted.map((r) => r._id!);
+
+      const result = await wrapper.updateById(indexName, ids, {
+        script: {
+          lang: "painless",
+          source: "ctx._source.times++",
+        },
+      });
+
+      expect(result.every((r) => r.statusCode == 200)).toBeTruthy();
+      expect(result.every((r) => r.result == "updated")).toBeTruthy();
+    } catch (error) {
+      throw error;
+    }
+  });
+
+  test("update may docs by query", async () => {
+    try {
+      const indexName = "game-of-thrones";
+      const docs = [
+        {
+          character: "Ned Stark",
+          quote: "Winter is coming.",
+        },
+        {
+          character: "Arya Stark",
+          quote: "A girl is Arya Stark of Winterfell. And I'm going home.",
+        },
+      ];
+
+      await wrapper.indexMany(indexName, docs, {
+        refresh: true,
+      });
+
+      const updateDoc: IUpdateDoc = {
+        script: {
+          lang: "painless",
+          source: 'ctx._source["house"] = "stark"',
+        },
+        query: {
+          match: {
+            character: "stark",
+          },
+        },
+      };
+
+      const result = await wrapper.updateByQuery(indexName, updateDoc, {
+        refresh: true,
+      });
+
+      expect(result.statusCode).toBe(200);
+      expect(result.updated).toBeGreaterThanOrEqual(0);
+    } catch (error) {
+      throw error;
+    }
+  });
+
+  test("search docs", async () => {
+    try {
+      const indexName = "game-of-thrones";
+      const docs = [
+        {
+          character: "Ned Stark",
+          quote: "Winter is coming.",
+        },
+        {
+          character: "Arya Stark",
+          quote: "A girl is Arya Stark of Winterfell. And I'm going home.",
+        },
+      ];
+
+      await wrapper.indexMany(indexName, docs, {
+        refresh: true,
+      });
+
+      const query = {
+        query: {
+          match: {
+            quote: "winter",
+          },
+        },
+      };
+
+      const result = await wrapper.search(indexName, query, {
+        seq_no_primary_term: true,
+        size: 20,
+      });
+    } catch (error) {
+      throw error;
+    }
+  });
 });
