@@ -171,7 +171,7 @@ describe("Elasticsearch Wrapper", () => {
     }
   });
 
-  test.only("delete many docs by query", async () => {
+  test("delete many docs by query", async () => {
     try {
       const indexName = "game-of-thrones";
       const docs = [
@@ -196,7 +196,7 @@ describe("Elasticsearch Wrapper", () => {
       const search = {
         query: {
           match: {
-            quote: "dragon", 
+            quote: "dragon",
           },
         },
       };
@@ -343,7 +343,7 @@ describe("Elasticsearch Wrapper", () => {
         },
       });
 
-      expect(result[0].statusCode).toBe(200);
+      expect(result[0]._statusCode).toBe(200);
       expect(result[0].result).toBe("updated");
     } catch (error) {
       throw error;
@@ -362,8 +362,7 @@ describe("Elasticsearch Wrapper", () => {
         },
       });
       // console.log(result);
-
-      expect(result[0].statusCode).toBe(404);
+      expect(result[0]._statusCode).toBe(404);
       expect(result[0].error).toBeDefined();
     } catch (error) {
       throw error;
@@ -391,16 +390,17 @@ describe("Elasticsearch Wrapper", () => {
         },
       });
 
-      expect(result[0].statusCode).toBe(200);
+      expect(result[0]._statusCode).toBe(200);
       expect(result[0].result).toBe("updated");
 
       const docs = await wrapper.getById(indexName, id);
+      expect(docs[0].times).toBe(1);
     } catch (error) {
       throw error;
     }
   });
 
-  test("update may doc by id using doc model", async () => {
+  test("update many doc by id using doc model", async () => {
     try {
       const indexName = "game-of-thrones";
       const docs = [
@@ -431,14 +431,14 @@ describe("Elasticsearch Wrapper", () => {
         },
       });
 
-      expect(result.every((r) => r.statusCode == 200)).toBeTruthy();
+      expect(result.every((r) => r._statusCode == 200)).toBeTruthy();
       expect(result.every((r) => r.result == "updated")).toBeTruthy();
     } catch (error) {
       throw error;
     }
   });
 
-  test("update may doc by id using script model", async () => {
+  test("update many doc by id using script model", async () => {
     try {
       const indexName = "game-of-thrones";
       const docs = [
@@ -472,7 +472,7 @@ describe("Elasticsearch Wrapper", () => {
         },
       });
 
-      expect(result.every((r) => r.statusCode == 200)).toBeTruthy();
+      expect(result.every((r) => r._statusCode == 200)).toBeTruthy();
       expect(result.every((r) => r.result == "updated")).toBeTruthy();
     } catch (error) {
       throw error;
