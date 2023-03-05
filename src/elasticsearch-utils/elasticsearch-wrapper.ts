@@ -378,51 +378,6 @@ export function createElasticWrapper(cfg: ElasticConfig) {
     }
   }
 
-  // /**
-  //  * update one or many docs by id
-  //  * @param indexName
-  //  * @param ids
-  //  * @param updateDoc
-  //  * @param options
-  //  * @returns
-  //  */
-  // async function updateById<T extends IUpdateDoc>(
-  //   indexName: string,
-  //   ids: string | Array<string>,
-  //   updateDoc: T,
-  //   options?: Partial<RequestParams.Update>
-  // ): Promise<Array<SimpleResponseResult>> {
-  //   try {
-  //     if (!Array.isArray(ids)) {
-  //       ids = [ids];
-  //     }
-
-  //     const response = await pMap(
-  //       ids,
-  //       async (id) => {
-  //         try {
-  //           return await client.update({
-  //             ...options,
-  //             index: indexName,
-  //             id: id,
-  //             body: updateDoc,
-  //           });
-  //         } catch (error: any) {
-  //           const { body, statusCode } = error.meta;
-  //           return { body, statusCode } as ApiResponse;
-  //         }
-  //       },
-  //       { concurrency: 5 }
-  //     );
-
-  //     const result = response.map((res) => toSimpleResult(res));
-
-  //     return result;
-  //   } catch (error) {
-  //     throw error;
-  //   }
-  // }
-
   /**
    * update docs by query
    * @param indexName
