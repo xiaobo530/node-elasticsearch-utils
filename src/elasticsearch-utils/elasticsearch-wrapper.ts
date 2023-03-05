@@ -271,7 +271,16 @@ export function createElasticWrapper(cfg: ElasticConfig) {
             result,
           } as ActionResult;
         } catch (error: any) {
-          return { _statusCode: 404, _index: indexName, _id: id };
+          const { statusCode, body } = error.meta;
+          const { _index, _id, _seq_no, _primary_term, result } = body;
+          return {
+            _statusCode: statusCode,
+            _index,
+            _id,
+            _seq_no,
+            _primary_term,
+            result,
+          };
         }
       },
       { concurrency: 5 }

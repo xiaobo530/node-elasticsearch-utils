@@ -93,7 +93,7 @@ describe("Elasticsearch Wrapper", () => {
     }
   });
 
-  test.only("delete one docs by id", async () => {
+  test("delete one docs by id", async () => {
     try {
       const indexName = "game-of-thrones";
       const docs = [
@@ -128,7 +128,7 @@ describe("Elasticsearch Wrapper", () => {
       const result = (await wrapper.deleteById(indexName, id))[0];
       // console.log(result);
 
-      expect(result.statusCode).toBeUndefined();
+      expect(result._statusCode).toBe(404);
       expect(result.result).toBe("not_found");
     } catch (error) {
       throw error;
@@ -136,7 +136,7 @@ describe("Elasticsearch Wrapper", () => {
     }
   });
 
-  test("delete many docs by id", async () => {
+  test.only("delete many docs by id", async () => {
     try {
       const indexName = "game-of-thrones";
       const docs = [
@@ -164,7 +164,7 @@ describe("Elasticsearch Wrapper", () => {
       const result = await wrapper.deleteById(indexName, ids);
 
       // console.log(result);
-      expect(result.every((r) => r.statusCode == 200)).toBeTruthy();
+      expect(result.every((r) => r._statusCode == 200)).toBeTruthy();
       expect(result.every((r) => r.result == "deleted")).toBeTruthy();
     } catch (error) {
       throw error;
