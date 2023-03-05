@@ -136,7 +136,7 @@ describe("Elasticsearch Wrapper", () => {
     }
   });
 
-  test.only("delete many docs by id", async () => {
+  test("delete many docs by id", async () => {
     try {
       const indexName = "game-of-thrones";
       const docs = [
@@ -171,7 +171,7 @@ describe("Elasticsearch Wrapper", () => {
     }
   });
 
-  test("delete many docs by query", async () => {
+  test.only("delete many docs by query", async () => {
     try {
       const indexName = "game-of-thrones";
       const docs = [
@@ -196,15 +196,15 @@ describe("Elasticsearch Wrapper", () => {
       const search = {
         query: {
           match: {
-            quote: "dragon",
+            quote: "dragon", 
           },
         },
       };
 
       const result = await wrapper.deleteByQuery(indexName, search);
-      console.log(result);
+      // console.log(result);
 
-      expect(result.statusCode).toBe(200);
+      expect(result._statusCode).toBe(200);
       expect(result.deleted).toBeGreaterThanOrEqual(1);
     } catch (error) {
       throw error;

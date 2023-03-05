@@ -292,40 +292,6 @@ export function createElasticWrapper(cfg: ElasticConfig) {
     return response;
   }
 
-  // /**
-  //  * delete docs by id(s)
-  //  * @param indexName
-  //  * @param ids
-  //  * @param options
-  //  * @returns
-  //  */
-  // async function deleteById(
-  //   indexName: string,
-  //   ids: string | Array<string>,
-  //   options?: Partial<RequestParams.Delete>
-  // ): Promise<Array<SimpleResponseResult>> {
-  //   if (!Array.isArray(ids)) {
-  //     ids = [ids];
-  //   }
-
-  //   const response = await pMap(
-  //     ids,
-  //     async (id) => {
-  //       try {
-  //         return await client.delete({ ...options, index: indexName, id: id });
-  //       } catch (error: any) {
-  //         return { body: error.meta.body };
-  //       }
-  //     },
-  //     { concurrency: 5 }
-  //   );
-
-  //   console.log(response);
-
-  //   const result = response.map((res) => toSimpleResult(res));
-  //   return result;
-  // }
-
   /**
    * delete docs by query
    * @param indexNames
@@ -337,16 +303,18 @@ export function createElasticWrapper(cfg: ElasticConfig) {
     indexNames: string | Array<string>,
     query: Record<string, any>,
     options?: Partial<RequestParams.DeleteByQuery>
-  ): Promise<SimpleResponseResult> {
+  ): Promise<ActionResult> {
     const response = await client.deleteByQuery({
       ...options,
       index: indexNames,
       body: query,
     });
+    const { statusCode, body } = response;
+    const { deleted, total } = body;
 
-    console.log(response);
+    // console.log(response);
 
-    const result = toSimpleResult(response);
+    const result = { _statusCode: statusCode, deleted, total } as ActionResult;
 
     return result;
   }
