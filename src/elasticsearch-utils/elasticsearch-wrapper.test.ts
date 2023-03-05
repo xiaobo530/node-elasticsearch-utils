@@ -32,7 +32,7 @@ describe("Elasticsearch Wrapper", () => {
 
       // console.log(result);
 
-      expect(result![0].statusCode).toBe(201);
+      expect(result![0]._statusCode).toBe(201);
       expect(result![0].result).toBe("created");
     } catch (error) {
       console.log(error);
@@ -44,7 +44,7 @@ describe("Elasticsearch Wrapper", () => {
     try {
       const indexName = "game-of-thrones";
       const doc = {
-        id: "1234",
+        id: "id_for_one_index",
         character: "Ned Stark",
         quote: "Winter is coming.",
       };
@@ -55,7 +55,7 @@ describe("Elasticsearch Wrapper", () => {
 
       // console.log(result);
 
-      expect([201, 200]).toContain(result![0].statusCode);
+      expect([201, 200]).toContain(result![0]._statusCode);
       expect(["created", "updated"]).toContain(result![0].result);
     } catch (error) {
       console.log(error);
@@ -86,8 +86,8 @@ describe("Elasticsearch Wrapper", () => {
       // console.log(result);
 
       expect(result.length).toBe(3);
-      expect(result[0].statusCode).toBe(201);
-      expect(result[0].result).toBe("created");
+      expect(result.every((r) => r._statusCode == 201)).toBeTruthy();
+      expect(result.every((r) => r.result == "created")).toBeTruthy();
     } catch (error) {
       throw error;
     }
@@ -479,7 +479,7 @@ describe("Elasticsearch Wrapper", () => {
     }
   });
 
-  test.only("update may docs by query", async () => {
+  test("update may docs by query", async () => {
     try {
       const indexName = "game-of-thrones";
       const docs = [

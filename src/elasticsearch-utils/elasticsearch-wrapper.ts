@@ -54,13 +54,13 @@ export interface SimpleResponseResult {
 }
 
 export interface ActionResult {
-  _statusCode: number | null;
+  _statusCode: 200 | 201 | 404 | null;
   _index?: string;
   _id?: string;
   _version?: number;
   _seq_no?: number;
   _primary_term?: number;
-  result?: "deleted" | "updated";
+  result?: "created" | "deleted" | "updated";
   total?: number;
   updated?: number;
   deleted?: number;
@@ -216,7 +216,7 @@ export function createElasticWrapper(cfg: ElasticConfig) {
     index: string,
     docs: T | Array<T>,
     options?: Partial<RequestParams.Index>
-  ): Promise<Array<SimpleResponseResult>> {
+  ): Promise<Array<ActionResult>> {
     if (!Array.isArray(docs)) {
       docs = [docs];
     }
@@ -224,18 +224,29 @@ export function createElasticWrapper(cfg: ElasticConfig) {
     const response = await pMap(
       docs,
       async (doc) => {
-        return await client.index(toIndexRequest(index, doc, options));
+        const { statusCode, body } = await client.index({
+          ...options,
+          index,
+          body: doc,
+          id: doc.id,
+        });
+        const { _index, _id, _seq_no, _primary_term, result } = body;
+        return {
+          _statusCode: statusCode,
+          _index,
+          _id,
+          _seq_no,
+          _primary_term,
+          result,
+        } as ActionResult;
       },
       { concurrency: 5 }
     );
-    // console.log(response);
 
-    const result = response.map((res) => toSimpleResult(res));
-    // console.log(result);
-
-    return result;
+    return response;
   }
 
+  
   /**
    * delete docs by id(s)
    * @param indexName
@@ -376,69 +387,37 @@ export function createElasticWrapper(cfg: ElasticConfig) {
     }
   }
 
-    /**
+  /**
    * update docs by query
    * @param indexName
    * @param updateDoc
    * @param options
    */
-    async function updateByQuery<T extends IUpdateDoc>(
-      indexName: string,
-      updateDoc: T,
-      options?: Partial<RequestParams.UpdateByQuery>
-    ): Promise<ActionResult> {
-      try {
-        const response = await client.updateByQuery({
-          ...options,
-          index: indexName,
-          body: updateDoc,
-        });
-  
-        const { statusCode, body } = response;
-        const { updated, total } = body;
-    
-        const result = { _statusCode: statusCode, updated, total } as ActionResult;
+  async function updateByQuery<T extends IUpdateDoc>(
+    indexName: string,
+    updateDoc: T,
+    options?: Partial<RequestParams.UpdateByQuery>
+  ): Promise<ActionResult> {
+    try {
+      const response = await client.updateByQuery({
+        ...options,
+        index: indexName,
+        body: updateDoc,
+      });
 
-        
-        // console.log(response);
-  
-        // const result = toSimpleResult(response);
-  
-        // console.log(result);
-        return result;
-      } catch (error) {
-        throw error;
-      }
+      const { statusCode, body } = response;
+      const { updated, total } = body;
+
+      const result = {
+        _statusCode: statusCode,
+        updated,
+        total,
+      } as ActionResult;
+      return result;
+    } catch (error) {
+      throw error;
     }
-
-  // /**
-  //  * update docs by query
-  //  * @param indexName
-  //  * @param updateDoc
-  //  * @param options
-  //  */
-  // async function updateByQuery<T extends IUpdateDoc>(
-  //   indexName: string,
-  //   updateDoc: T,
-  //   options?: Partial<RequestParams.UpdateByQuery>
-  // ): Promise<SimpleResponseResult> {
-  //   try {
-  //     const response = await client.updateByQuery({
-  //       ...options,
-  //       index: indexName,
-  //       body: updateDoc,
-  //     });
-
-  //     // console.log(response);
-
-  //     const result = toSimpleResult(response);
-
-  //     // console.log(result);
-  //     return result;
-  //   } catch (error) {
-  //     throw error;
-  //   }
-  // }
+  }
 
   async function search<T = IBaseDoc>(
     indexName: string,
