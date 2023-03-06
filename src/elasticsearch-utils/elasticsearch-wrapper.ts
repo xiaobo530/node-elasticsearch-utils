@@ -39,20 +39,6 @@ export interface IUpdateDoc {
   [index: string]: any;
 }
 
-export interface SimpleResponseResult {
-  statusCode: number;
-  _index?: string;
-  _id?: string;
-  _version?: number;
-  result?: string;
-  total?: number;
-  updated?: number;
-  deleted?: number;
-  error?: any;
-  exist?: boolean;
-  [index: string]: any;
-}
-
 export interface ActionResult {
   _statusCode: 200 | 201 | 404 | null;
   _index?: string;
@@ -86,23 +72,6 @@ export function toIndexRequest<T extends IBaseDoc>(
     body: doc,
     id: doc.id,
   };
-}
-
-export function toSimpleResult(apiResponse: any): SimpleResponseResult {
-  const statusCode = apiResponse.statusCode;
-  const { _index, _id, _version, result, deleted, total, error, updated } =
-    apiResponse.body;
-  return {
-    statusCode,
-    _index,
-    _id,
-    _version,
-    result,
-    deleted,
-    updated,
-    total,
-    error,
-  } as SimpleResponseResult;
 }
 
 export function toDoc<T extends IBaseDoc = any>(apiResponse: any): T {

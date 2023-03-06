@@ -35,7 +35,7 @@ describe("Elasticsearch Wrapper", () => {
       expect(result![0]._statusCode).toBe(201);
       expect(result![0].result).toBe("created");
     } catch (error) {
-      console.log(error);
+      // console.log(error);
       throw error;
     }
   });
@@ -58,7 +58,7 @@ describe("Elasticsearch Wrapper", () => {
       expect([201, 200]).toContain(result![0]._statusCode);
       expect(["created", "updated"]).toContain(result![0].result);
     } catch (error) {
-      console.log(error);
+      // console.log(error);
       throw error;
     }
   });
