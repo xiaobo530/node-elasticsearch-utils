@@ -2,11 +2,10 @@ import { describe, test, expect } from "@jest/globals";
 import {
   createElasticWrapper,
   ElasticsearchWrapper,
-  toSimpleResult,
 } from "./elasticsearch-wrapper";
 import { Client, ApiResponse, RequestParams } from "@elastic/elasticsearch";
-import { isUndefined } from "util";
 import { IBaseDoc, IUpdateDoc } from "./elasticsearch-wrapper";
+import * as esb from "elastic-builder";
 
 describe("Elasticsearch Wrapper", () => {
   let wrapper: ElasticsearchWrapper;
@@ -289,7 +288,7 @@ describe("Elasticsearch Wrapper", () => {
       const result = (await wrapper.getById(indexName, id))[0];
       console.log(result);
 
-      expect(result._id).toBeUndefined();
+      expect(result._found).toBeFalsy();
     } catch (error) {}
   });
 
@@ -319,7 +318,9 @@ describe("Elasticsearch Wrapper", () => {
 
       const result = await wrapper.getById(indexName, ids);
 
-      expect(result.every((r) => r._id === undefined)).toBeFalsy();
+      // console.log(result);
+
+      expect(result.every((r) => r._found)).toBeFalsy();
     } catch (error) {}
   });
 
@@ -550,6 +551,48 @@ describe("Elasticsearch Wrapper", () => {
         seq_no_primary_term: true,
         size: 20,
       });
+
+      console.log(result);
+    } catch (error) {
+      throw error;
+    }
+  });
+
+  test.only("search docs by elastic-builder", async () => {
+    try {
+      const indexName = "game-of-thrones";
+      const docs = [
+        {
+          character: "Ned Stark",
+          quote: "Winter is coming.",
+        },
+        {
+          character: "Arya Stark",
+          quote: "A girl is Arya Stark of Winterfell. And I'm going home.",
+        },
+      ];
+
+      await wrapper.indexMany(indexName, docs, {
+        refresh: true,
+      });
+
+      const query = esb
+        .requestBodySearch()
+        .query(esb.matchQuery("quote", "winter"));
+      // const query = {
+      //   query: {
+      //     match: {
+      //       quote: "winter",
+      //     },
+      //   },
+      // };
+
+      const result = await wrapper.search(indexName, query, {
+        seq_no_primary_term: true,
+        size: 20,
+      });
+
+      console.log(result);
     } catch (error) {
       throw error;
     }

@@ -15,16 +15,7 @@ export interface IBaseDoc extends Record<string, any> {
   _version?: number;
   _seq_no?: number;
   _primary_term?: number;
-  [index: string]: any;
-}
-
-export interface IBaseResult {
-  _statusCode: number;
-  _index: string;
-  _id: string;
-  _error: any;
-  _seq_no: number;
-  _primary_term: number;
+  _found?: boolean;
   [index: string]: any;
 }
 
@@ -53,25 +44,6 @@ export interface ActionResult {
   error?: any;
   exist?: boolean;
   [index: string]: any;
-}
-
-export interface ExistsResult extends IBaseResult {
-  exists: boolean;
-}
-
-//******************************* */
-
-export function toIndexRequest<T extends IBaseDoc>(
-  index: string,
-  doc: T,
-  options?: Partial<RequestParams.Index>
-): RequestParams.Index<T> {
-  return {
-    ...options,
-    index: index,
-    body: doc,
-    id: doc.id,
-  };
 }
 
 export function toDoc<T extends IBaseDoc = any>(apiResponse: any): T {
@@ -121,7 +93,7 @@ export function createElasticWrapper(cfg: ElasticConfig) {
             _statusCode: statusCode,
             _id: id,
             _index: index,
-          };
+          } as ActionResult;
         } catch (error: any) {
           return {
             exists: false,
@@ -129,7 +101,7 @@ export function createElasticWrapper(cfg: ElasticConfig) {
             _id: id,
             _index: index,
             error: error,
-          };
+          } as ActionResult;
         }
       },
       { concurrency: 5, stopOnError: false }
@@ -158,20 +130,41 @@ export function createElasticWrapper(cfg: ElasticConfig) {
       ids,
       async (id) => {
         try {
-          return await client.get({ ...options, index, id });
+          const { statusCode, body } = await client.get({
+            ...options,
+            index,
+            id,
+          });
+          const {
+            _index,
+            _id,
+            _version,
+            _seq_no,
+            _primary_term,
+            _source,
+            found,
+          } = body;
+          return {
+            _statusCode: statusCode,
+            _index,
+            _id,
+            _seq_no,
+            _primary_term,
+            _found: found,
+            _version,
+            ..._source,
+          };
         } catch (error: any) {
-          // console.log(error);
-          return { body: error.meta.body };
+          const { statusCode, body } = error.meta;
+          const { _index, _id, found } = body;
+          return { _statusCode: statusCode, _index, _id, _found: found };
         }
       },
       { concurrency: 5, stopOnError: false }
     );
     // console.log(response);
 
-    const result = response.map((res) => toDoc(res));
-
-    // console.log(result);
-    return result;
+    return response;
   }
 
   /**
@@ -215,7 +208,6 @@ export function createElasticWrapper(cfg: ElasticConfig) {
     return response;
   }
 
-  
   /**
    * delete docs by id(s)
    * @param indexName
@@ -388,6 +380,13 @@ export function createElasticWrapper(cfg: ElasticConfig) {
     }
   }
 
+  /**
+   * search docs
+   * @param indexName 
+   * @param query 
+   * @param options 
+   * @returns 
+   */
   async function search<T = IBaseDoc>(
     indexName: string,
     query: Record<string, any>,
