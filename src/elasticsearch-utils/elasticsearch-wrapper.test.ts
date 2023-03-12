@@ -558,7 +558,7 @@ describe("Elasticsearch Wrapper", () => {
     }
   });
 
-  test.only("search docs by elastic-builder", async () => {
+  test("search docs by elastic-builder", async () => {
     try {
       const indexName = "game-of-thrones";
       const docs = [
@@ -579,13 +579,6 @@ describe("Elasticsearch Wrapper", () => {
       const query = esb
         .requestBodySearch()
         .query(esb.matchQuery("quote", "winter"));
-      // const query = {
-      //   query: {
-      //     match: {
-      //       quote: "winter",
-      //     },
-      //   },
-      // };
 
       const result = await wrapper.search(indexName, query, {
         seq_no_primary_term: true,
